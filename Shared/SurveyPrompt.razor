@@ -1,0 +1,13 @@
+﻿<div class="alert alert-secondary mt-4" style="font-family: @(FontFamily)">
+    <span class="oi oi-pencil me-2" aria-hidden="true"></span>
+    <strong>@Title</strong>
+    @FontFamily 
+</div>
+
+@code {
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public string? FontFamily { get; set; }
+}

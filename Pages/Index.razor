@@ -1,0 +1,136 @@
+﻿@page "/"
+@using System.Drawing
+@using System.Text
+@using Microsoft.AspNetCore.Components.Forms
+@inject IJSRuntime JSRuntime
+
+<PageTitle>AsciiConvertToImage</PageTitle>
+
+<h1>Конвертер изображения в ASCII</h1>
+
+
+<EditForm Model="this" OnValidSubmit="async () => await FileSelected(null)">
+    <div>
+        <label>Ширина:</label>
+        <InputNumber @bind-Value="userWidth" /> px
+        <br />
+        <br />
+        <label>Высота:</label>
+        <InputNumber @bind-Value="userHeight" /> px
+        <br />
+        <br />
+        <label>Размер шрифта:</label>
+        <InputNumber @bind-Value="userFontSize" /> px
+        <br />
+        <br />
+        <label>Выберите шрифт:</label>
+        <InputSelect @bind-Value="selectedFont">
+            <option value="Consolas, monospace">Consolas, monospace</option>
+            <option value="Courier New, monospace">Courier New, monospace</option>
+            <option value="Cascadia Mono">Cascadia Mono</option>
+        </InputSelect>
+        <br />
+        <br />
+        <label>Выберите набор символов:</label>
+        <InputSelect @bind-Value="selectedShades">
+            <option value="shades_first">shades_first</option>
+            <option value="shades_second">shades_second</option>
+        </InputSelect>
+    </div>
+    <br />
+
+    <InputFile OnChange="FileSelected" accept="image/*" />
+</EditForm>
+
+<div>
+    @if (asciiRows != null)
+    {
+        <SurveyPrompt Title="ASCII:" FontFamily="@selectedFont" />
+        <pre style="font-family: @selectedFont; font-size: @(userFontSize+ "px");">@asciiRows</pre>
+    }
+</div>
+
+@code {
+    private string asciiRows; 
+    private const int DEFAULT_WIDTH = 500;
+    private const int DEFAULT_HEIGHT = 900;
+    private const int DEFAULT_FONT_SIZE = 6;
+    private readonly string[] shades_first = { "@", "#", "%", "*", ":", "-", ".", " " };
+    private readonly string[] shades_second = { "@", "#", "%", "o", "x", "|", ",", " " };
+
+    private int userWidth = DEFAULT_WIDTH; // Пользовательская ширина
+    private int userHeight =  DEFAULT_HEIGHT; // Пользовательская высота
+    private int userFontSize = DEFAULT_FONT_SIZE; // Пользовательский размер шрифта
+    private string selectedFont = "Consolas, monospace"; // Шрифт по умолчанию
+    private string selectedShades = "shades_first"; // Набор символов по умолчанию
+
+    private async Task FileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+
+        if (file != null)
+        {
+            var maxAllowedSize = 15728640;//ограничение по размеру 15МБ
+            using var fileStream = file.OpenReadStream(maxAllowedSize);
+            using var memoryStream = new MemoryStream();
+            await fileStream.CopyToAsync(memoryStream);
+
+            using var bitmap = new Bitmap(memoryStream);
+
+            var resizedBitmap = ResizeBitmap(bitmap, userWidth, userHeight);
+
+            ConvertToGrayscale(resizedBitmap);
+
+            asciiRows = GenerateAsciiArt(resizedBitmap);
+        }   
+    }
+    // Пропорциональное изменение исходного изображения
+    private Bitmap ResizeBitmap(Bitmap bitmap, int maxWidth, int maxHeight)
+    {
+        int newWidth = Math.Min(bitmap.Width, maxWidth);
+        int newHeight = Math.Min(bitmap.Height, maxHeight);
+
+        // Пропорциональное изменение размера
+        double relation = (double)bitmap.Width / bitmap.Height;
+        if (newWidth / relation > maxHeight)
+            newWidth = (int)(maxHeight * relation);
+        else
+            newHeight = (int)(newWidth / relation);
+
+        return new Bitmap(bitmap, new Size(newWidth, newHeight));
+    }
+    // Конвертация в серый цвет
+    private void ConvertToGrayscale(Bitmap bitmap)
+    {
+        for (int y = 0; y < bitmap.Height; y++)
+        {
+            for (int x = 0; x < bitmap.Width; x++)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                int avg = (pixel.R + pixel.G + pixel.B) / 3;
+                bitmap.SetPixel(x, y, Color.FromArgb(avg, avg, avg));
+            }
+        }
+    }
+    // Алгоритм преобразования
+    private string GenerateAsciiArt(Bitmap bitmap)
+    {
+        var sb = new StringBuilder();
+
+        // Выбор массива символов на основе выбора пользователя
+        var shades = selectedShades == "shades_first" ? shades_first : shades_second;
+
+        for (int y = 0; y < bitmap.Height; y++)
+        {
+            for (int x = 0; x < bitmap.Width; x++)
+            {
+                int grayValue = bitmap.GetPixel(x, y).R;
+                int shadeIndex = grayValue * (shades.Length - 1) / 255;
+                sb.Append(shades[shadeIndex]);
+            }
+            sb.AppendLine();
+        }
+
+        return sb.ToString();
+    }
+}
