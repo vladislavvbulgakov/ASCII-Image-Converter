@@ -1,2 +1,2 @@
 # ASCII-Image-Converter
-This application allows you to generate ASCII images directly in the browser.
+ASCII image generator directly in the browser using Blazor
